@@ -1,0 +1,14 @@
+streamlit
+langchain
+langchain-community
+langchain-openai
+langchain-core
+tavily-python
+matplotlib
+python-docx
+sentence-transformers
+chromadb
+rank-bm25
+numpy
+requests
+pillow
