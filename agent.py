@@ -2472,7 +2472,56 @@ with tab2:
     st.subheader("📊 历史报告对比")
     st.write("选择两份历史报告进行对比分析")
     
+    # 显示报告保存路径（调试用）
+    st.caption(f"📁 报告保存路径：{REPORTS_DIR}")
+    
     history_reports = get_history_reports()
+    
+    # 显示历史报告列表
+    if history_reports:
+        st.success(f"✅ 找到 {len(history_reports)} 份历史报告")
+        with st.expander("📋 查看所有历史报告", expanded=True):
+            for i, r in enumerate(history_reports):
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    st.write(f"**{i+1}. {r['filename'][:50]}**")
+                    st.caption(f"⏰ {r['time']} | 📦 {r['size']}")
+                with col2:
+                    # 提供下载功能
+                    try:
+                        with open(r['path'], 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        st.download_button(
+                            label="⬇️ 下载MD",
+                            data=content,
+                            file_name=r['filename'],
+                            mime='text/markdown',
+                            key=f"download_md_{i}"
+                        )
+                    except:
+                        st.write("读取失败")
+                with col3:
+                    # 提供HTML下载
+                    html_path = r['path'].replace('.md', '.html')
+                    if os.path.exists(html_path):
+                        try:
+                            with open(html_path, 'r', encoding='utf-8') as f:
+                                html_content = f.read()
+                            st.download_button(
+                                label="⬇️ 下载HTML",
+                                data=html_content,
+                                file_name=r['filename'].replace('.md', '.html'),
+                                mime='text/html',
+                                key=f"download_html_{i}"
+                            )
+                        except:
+                            st.write("读取失败")
+    else:
+        st.warning("⚠️ 暂无历史报告")
+        st.info("💡 提示：在Streamlit Cloud部署时，历史报告在应用重启后会丢失，建议下载保存到本地。")
+    
+    st.divider()
+    
     if len(history_reports) >= 2:
         col1, col2 = st.columns(2)
         with col1:
