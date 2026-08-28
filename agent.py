@@ -869,7 +869,56 @@ def extract_keywords_with_jieba(text, product_name="", product_category="", top_
         # 合并所有停用词
         all_stopwords = stopwords | product_words
         
-        # 提取长度>=2的产品名子词，用于模糊匹配（关键！之前是>=3，现在改成>=2）
+        # ========== 英文停用词列表（彻底过滤the/and/to等无意义英文词）==========
+        english_stopwords = {
+            'the', 'and', 'to', 'in', 'it', 'of', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall', 'should', 'may', 'might', 'must',
+            'can', 'could', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'we', 'they', 'me', 'him',
+            'her', 'us', 'them', 'my', 'your', 'his', 'its', 'our', 'their', 'mine', 'yours', 'hers', 'ours',
+            'what', 'which', 'who', 'whom', 'whose', 'where', 'when', 'why', 'how', 'all', 'each', 'every', 'both',
+            'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than',
+            'too', 'very', 'just', 'because', 'as', 'until', 'while', 'at', 'by', 'for', 'with', 'about', 'against',
+            'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'from', 'up', 'down', 'out',
+            'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'any', 'if', 'or',
+            'but', 'also', 'than', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any',
+            'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same',
+            'so', 'than', 'too', 'very', 'just', 'iphone', 'android', 'phone', 'mobile', 'smartphone', 'device',
+            'product', 'item', 'goods', 'thing', 'stuff', 'way', 'time', 'day', 'year', 'month', 'week', 'hour',
+            'minute', 'second', 'first', 'last', 'next', 'previous', 'new', 'old', 'good', 'bad', 'great', 'nice',
+            'well', 'better', 'best', 'worse', 'worst', 'much', 'many', 'little', 'less', 'least', 'more', 'most',
+            'really', 'very', 'quite', 'rather', 'fairly', 'pretty', 'somewhat', 'slightly', 'almost', 'nearly',
+            'enough', 'too', 'so', 'such', 'quite', 'rather', 'pretty', 'somewhat', 'slightly', 'almost', 'nearly',
+            'pro', 'max', 'ultra', 'plus', 'mini', 'air', 'lite', 'se', 'gen', 'model', 'type', 'version', 'edition',
+            'series', '款', '代', '版', '旗舰', '高端', '中端', '低端', '入门', 'budget', 'flagship',
+        }
+        all_stopwords = all_stopwords | english_stopwords
+        
+        # ========== 无价值中文词黑名单（彻底过滤无意义词）==========
+        useless_chinese_words = {
+            '评价', '评论', '反馈', '建议', '投诉', '举报', '拉黑', '收藏', '加购', '下单', '付款', '发货',
+            '收货', '验货', '确认', '晒单', '分享', '推荐', '回购', '复购', '续购', '增购', '换购', '退购',
+            '系统', '默认', '设置', '配置', '参数', '选项', '功能', '操作', '使用', '体验', '感觉', '觉得',
+            '认为', '以为', '看来', '听说', '据说', '总的来说', '总而言之', '及时', '做出', '做出', '好评',
+            '差评', '中评', '支持', '银色', '金色', '黑色', '白色', '灰色', '蓝色', '红色', '绿色', '紫色',
+            '粉色', '橙色', '黄色', '颜色', '配色', '官方', '旗舰店', '专卖店', '专营店', '直营店', '授权店',
+            '正品', '行货', '水货', '翻新', '二手', '全新', '包邮', '快递', '物流', '发货', '收货', '客服',
+            '售后', '保修', '质保', '发票', '收据', '订单', '付款', '退款', '退货', '换货', '赠品', '配件',
+            '说明书', '包装', '包装盒', '包装袋', '包装纸', '包装膜', '包装泡沫', '包装气泡', '包装珍珠棉',
+            '方未', '未', '方', '的话', '的话', '的话', '的话', '的话', '的话', '的话', '的话', '的话',
+            '一下', '一些', '一点', '一样', '一直', '一定', '一般', '一起', '一共', '不是', '不会', '不能',
+            '不要', '不用', '不如', '不过', '不仅', '不但', '不管', '还是', '还有', '或者', '或许', '也许',
+            '可能', '应该', '必须', '需要', '这个', '那个', '这些', '那些', '这样', '那样', '这么', '那么',
+            '怎么', '什么', '为什么', '怎么样', '怎么办', '如何', '为何', '哪里', '哪个', '哪些', '几时', '多少',
+            '真的', '非常', '特别', '十分', '相当', '比较', '有点', '有些', '有的', '有时', '感觉', '觉得',
+            '认为', '以为', '看来', '听说', '据说', '总的来说', '总而言之', '一个', '一下', '一些', '一点',
+            '一样', '一直', '一定', '一般', '一起', '一共', '不是', '不会', '不能', '不要', '不用', '不如',
+            '不过', '不仅', '不但', '不管', '还是', '还有', '还是', '或者', '或许', '也许', '可能', '应该',
+            '必须', '需要', '这个', '那个', '这些', '那些', '这样', '那样', '这么', '那么', '怎么', '什么',
+            '为什么', '怎么样', '怎么办', '如何', '为何', '哪里', '哪个', '哪些', '几时', '多少',
+        }
+        all_stopwords = all_stopwords | useless_chinese_words
+        
+        # 提取长度>=2的产品名子词，用于模糊匹配
         product_subwords = {w for w in product_words if len(w) >= 2}
         
         # 用jieba分词
@@ -879,35 +928,48 @@ def extract_keywords_with_jieba(text, product_name="", product_category="", top_
         word_count = Counter()
         for word in words:
             word = word.strip().lower()
-            # 过滤条件：2-6字、中文或英文、不是停用词、不是纯数字
-            if (2 <= len(word) <= 6 and 
-                re.match(r'^[\u4e00-\u9fa5a-zA-Z]+$', word) and
-                word not in all_stopwords and
-                not re.match(r'^\d+$', word)):
-                # 额外检查1：如果词包含产品名子词（长度>=2），也过滤掉
-                contains_product = False
-                for pw in product_subwords:
-                    if pw in word:
-                        contains_product = True
-                        break
-                # 额外检查2：如果词包含任何品牌库中的品牌名（长度>=2），也过滤掉
-                if not contains_product:
-                    for cat, brands in BRAND_LIBRARY.items():
-                        for brand in brands:
-                            brand_lower = brand.lower()
-                            if len(brand_lower) >= 2 and brand_lower in word:
-                                contains_product = True
-                                break
-                        if contains_product:
+            # 过滤条件1：长度2-6字
+            if not (2 <= len(word) <= 6):
+                continue
+            # 过滤条件2：只能是中文（彻底过滤英文词，因为英文评价很少且大部分是停用词）
+            if not re.match(r'^[\u4e00-\u9fa5]+$', word):
+                continue
+            # 过滤条件3：不是停用词
+            if word in all_stopwords:
+                continue
+            # 过滤条件4：不是纯数字
+            if re.match(r'^\d+$', word):
+                continue
+            # 过滤条件5：如果词包含产品名子词（长度>=2），也过滤掉
+            contains_product = False
+            for pw in product_subwords:
+                if pw in word:
+                    contains_product = True
+                    break
+            if contains_product:
+                continue
+            # 过滤条件6：如果词包含任何品牌库中的品牌名（长度>=2），也过滤掉
+            if not contains_product:
+                for cat, brands in BRAND_LIBRARY.items():
+                    for brand in brands:
+                        brand_lower = brand.lower()
+                        if len(brand_lower) >= 2 and brand_lower in word:
+                            contains_product = True
                             break
-                # 额外检查3：如果词是纯英文且长度<=4，检查是否是常见品牌缩写
-                if not contains_product and re.match(r'^[a-zA-Z]+$', word) and len(word) <= 4:
-                    common_brands = {'apple', 'huawei', 'xiaomi', 'oppo', 'vivo', 'sony', 'lg', 'hp', 'dell', 'asus', 'acer', 'msi', 'rog', 'nike', 'adidas', 'puma', 'uniqlo', 'zara', 'nars', 'mac', 'dior', 'ysl', 'gopro', 'dji', 'tp', 'jd', 'tv', 'pc', 'app', 'web', 'api', 'ui', 'ux', 'ai', 'vr', 'ar', 'iot', '5g', '4g', '3g', '2g', '1g', 'gps', 'nfc', 'wifi', '蓝牙', 'usb', 'hdmi', 'dp', 'vga', 'dvi', 'rgb', 'led', 'lcd', 'oled', 'amoled', 'ips', 'tn', 'va', 'pls', 'ads', 'hva', 'mva', 'pva', 'ffs', 'ffs'}
-                    if word in common_brands:
-                        contains_product = True
-                
-                if not contains_product:
-                    word_count[word] += 1
+                    if contains_product:
+                        break
+            if contains_product:
+                continue
+            # 过滤条件7：无价值词（单字重复、语气词等）
+            if len(set(word)) == 1:  # 单字重复，如"好好"、"的的"
+                continue
+            # 过滤条件8：词必须包含至少一个有意义的字（不是纯助词/介词/连词）
+            meaningless_chars = {'的', '了', '是', '在', '我', '有', '和', '就', '不', '人', '都', '一', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这', '那', '他', '她', '它', '们', '这个', '那个', '什么', '怎么', '为什么', '可以', '但是', '因为', '所以', '如果', '虽然', '而且', '或者', '还是', '就是', '已经', '正在', '将要', '可能', '应该', '必须', '需要', '能够', '使得', '进行', '通过', '对于', '关于', '根据', '按照', '由于', '因此', '然而', '此外', '另外', '以及', '等等', '之类', '一下', '一些', '一点', '一样', '一直', '一定', '一般', '不是', '不会', '不能', '不要', '不用', '不如', '不过', '不仅', '不但', '不管', '还是', '还有', '或者', '或许', '也许', '可能', '应该', '必须', '需要', '这个', '那个', '这些', '那些', '这样', '那样', '这么', '那么', '怎么', '什么', '为什么', '怎么样', '怎么办', '如何', '为何', '哪里', '哪个', '哪些', '几时', '多少'}
+            if all(c in meaningless_chars for c in word):
+                continue
+            
+            # 通过所有过滤条件，统计
+            word_count[word] += 1
         
         # 按频次排序，取TOP_N
         top_keywords = word_count.most_common(top_n)
