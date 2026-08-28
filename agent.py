@@ -763,31 +763,57 @@ def extract_keywords_with_jieba(text, product_name="", product_category="", top_
             'php', 'jpg', 'png', 'gif', 'http', 'https', 'www', 'com', 'cn', 'net', 'org',
             '会员', '登录', '注册', '密码', '账号', '用户', '客服', '电话', '地址', '邮箱',
             '图片', '视频', '音频', '文件', '下载', '上传', '链接', '网站', '网页', '页面',
-            # 常见品牌名（确保不出现品牌名）
-            '苹果', '华为', '小米', 'oppo', 'vivo', '荣耀', '三星', '魅族', '一加', 'realme',
-            '白象', '三养', '农心', '不倒翁', '八道', 'paldo', '康师傅', '统一', '今麦郎', '日清',
-            '蜜雪冰城', '喜茶', '奈雪', '茶百道', '古茗', '沪上阿姨', '丘大叔', '挞柠', '茶救星球',
-            '科沃斯', '石头', '云鲸', '追觅', '美的', '海尔', '格力', '戴森',
-            '瑞幸', '星巴克', 'manner', 'm stand', 'seesaw',
-            '京东', '淘宝', '天猫', '拼多多', '苏宁', '国美', '唯品会',
-            '抖音', '快手', '小红书', 'b站', '哔哩哔哩', '微博', '微信',
+            # 常见品牌名（确保不出现品牌名，中英文都加）
+            '苹果', 'apple', 'iphone', '华为', 'huawei', 'mate', '小米', 'xiaomi', 'redmi', '红米',
+            'oppo', 'vivo', 'iqoo', '荣耀', 'honor', '三星', 'samsung', 'galaxy', '魅族', 'meizu',
+            '一加', 'oneplus', 'realme', '真我', '努比亚', 'nubia', '黑鲨', 'rog', '联想', 'lenovo',
+            '白象', '三养', 'samyang', '农心', 'nongshim', '不倒翁', 'ottogi', '八道', 'paldo',
+            '康师傅', '统一', '今麦郎', '日清', 'nissin', '出前一丁', '合味道', 'cup noodle',
+            '蜜雪冰城', 'mixue', '喜茶', 'heytea', '奈雪', 'nayuki', '茶百道', 'chagee', '古茗',
+            '沪上阿姨', 'auntea jenny', '丘大叔', '挞柠', '茶救星球', '1柠1', '啊一柠檬茶',
+            '科沃斯', 'ecovacs', '石头', 'roborock', '云鲸', 'narwal', '追觅', 'dreame', '美的', 'midea',
+            '海尔', 'haier', '格力', 'gree', '戴森', 'dyson', '小米米家', 'mijia', '飞利浦', 'philips',
+            '瑞幸', 'luckin', '星巴克', 'starbucks', 'manner', 'm stand', 'seesaw', 'tims', '库迪', 'cotti',
+            '京东', 'jd', '淘宝', 'taobao', '天猫', 'tmall', '拼多多', 'pinduoduo', '苏宁', '国美', '唯品会',
+            '抖音', 'douyin', 'tiktok', '快手', 'kuaishou', '小红书', 'xiaohongshu', 'red', 'b站', '哔哩哔哩', 'bilibili',
+            '微博', 'weibo', '微信', 'wechat', '知乎', 'zhihu',
+            # 产品型号常见词（确保不出现型号词）
+            'pro', 'max', 'ultra', 'plus', 'mini', 'air', 'lite', 'se', 's', 'e', 'x', 'xr', 'xs',
+            '系列', 'version', 'edition', 'gen', 'generation', 'model', 'type', '款', '代', '版',
+            '旗舰', 'flagship', '高端', '中端', '入门', 'budget',
+            # 常见网页噪音词
+            '点击', '查看', '详情', '更多', '了解', '购买', '下单', '客服', '咨询', '售后', '保修',
+            '正品', '行货', '水货', '翻新', '二手', '全新', '包邮', '快递', '物流', '发货', '收货',
         ])
         
         # 从产品名和类别中提取关键词，加入停用词（避免统计产品名本身和品牌名）
         product_words = set()
-        for word in re.findall(r'[\u4e00-\u9fa5a-zA-Z]+', product_name):
-            if len(word) >= 2:
-                product_words.add(word.lower())
-                # 也把单个词加入（比如"iPhone 17 Pro"拆成"iphone"、"17"、"pro"）
-                for subword in word.lower().split():
-                    if len(subword) >= 2:
-                        product_words.add(subword)
-        for word in re.findall(r'[\u4e00-\u9fa5a-zA-Z]+', product_category):
+        
+        # 提取产品名中的所有词（中文、英文、数字）
+        all_product_text = product_name + " " + product_category
+        # 按空格和常见分隔符拆分
+        for token in re.split(r'[\s\-_/\\|,，.。;；:：!！?？()（）\[\]【】]', all_product_text):
+            token = token.strip().lower()
+            if len(token) >= 2:
+                product_words.add(token)
+                # 如果是英文数字组合，再拆分
+                if re.match(r'^[a-zA-Z0-9]+$', token):
+                    # 拆分英文和数字（比如"iPhone17"拆成"iphone"和"17"）
+                    parts = re.findall(r'[a-zA-Z]+|\d+', token)
+                    for part in parts:
+                        if len(part) >= 2:
+                            product_words.add(part.lower())
+        
+        # 也提取中文词组
+        for word in re.findall(r'[\u4e00-\u9fa5]+', all_product_text):
             if len(word) >= 2:
                 product_words.add(word.lower())
         
         # 合并所有停用词
         all_stopwords = stopwords | product_words
+        
+        # 提取长度>=3的产品名子词，用于模糊匹配（比如"iphone"、"pro"、"max"）
+        product_subwords = {w for w in product_words if len(w) >= 3}
         
         # 用jieba分词
         words = jieba.lcut(text)
@@ -796,12 +822,19 @@ def extract_keywords_with_jieba(text, product_name="", product_category="", top_
         word_count = Counter()
         for word in words:
             word = word.strip().lower()
-            # 过滤条件：2-6字、中文或英文、不是停用词、不是产品名、不是纯数字
+            # 过滤条件：2-6字、中文或英文、不是停用词、不是纯数字
             if (2 <= len(word) <= 6 and 
                 re.match(r'^[\u4e00-\u9fa5a-zA-Z]+$', word) and
                 word not in all_stopwords and
                 not re.match(r'^\d+$', word)):
-                word_count[word] += 1
+                # 额外检查：如果词包含产品名子词（长度>=3），也过滤掉
+                contains_product = False
+                for pw in product_subwords:
+                    if pw in word:
+                        contains_product = True
+                        break
+                if not contains_product:
+                    word_count[word] += 1
         
         # 按频次排序，取TOP_N
         top_keywords = word_count.most_common(top_n)
