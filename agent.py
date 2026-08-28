@@ -740,11 +740,31 @@ def llm_extract_keywords(text, product_name, product_category, llm):
         return []
 
 def extract_keywords_with_jieba(text, product_name="", product_category="", top_n=15):
-    """用jieba分词进行真正的词频统计，确保频次真实可靠"""
+    """用jieba分词进行真正的词频统计，确保频次真实可靠，彻底过滤品牌名和产品型号"""
     try:
         import jieba
         import re
         from collections import Counter
+        
+        # ========== 通用品牌库（按品类分类，确保不出现任何品牌名）==========
+        BRAND_LIBRARY = {
+            "扫地机器人": ["科沃斯", "科沃", "ecovacs", "deebot", "地宝", "石头", "roborock", "云鲸", "narwal", "追觅", "dreame", "美的", "midea", "海尔", "haier", "戴森", "dyson", "小米", "米家", "mijia", "xiaomi", "飞利浦", "philips", "松下", "panasonic", "博世", "bosch", "小狗", "puppyoo", "莱克", "lexy", "浦桑尼克", "proscenic", "ilife", "360", "华为", "huawei"],
+            "手机": ["苹果", "apple", "iphone", "华为", "huawei", "mate", "pura", "小米", "xiaomi", "redmi", "红米", "oppo", "vivo", "iqoo", "荣耀", "honor", "三星", "samsung", "galaxy", "魅族", "meizu", "一加", "oneplus", "realme", "真我", "努比亚", "nubia", "黑鲨", "rog", "联想", "lenovo", "拯救者", "摩托罗拉", "motorola", "诺基亚", "nokia", "索尼", "sony", "xperia"],
+            "茶饮": ["蜜雪冰城", "mixue", "喜茶", "heytea", "奈雪", "nayuki", "茶百道", "chagee", "古茗", "沪上阿姨", "auntea jenny", "丘大叔", "挞柠", "茶救星球", "1柠1", "啊一柠檬茶", "瑞幸", "luckin", "星巴克", "starbucks", "manner", "m stand", "seesaw", "tims", "库迪", "cotti", "霸王茶姬", "chagee", "书亦烧仙草", "益禾堂", " CoCo", "都可", "一点点", "50岚", "贡茶", "快乐柠檬", "happylemon", "大卡司", "大卡司", "茶颜悦色", "sexytea"],
+            "方便食品": ["白象", "三养", "samyang", "农心", "nongshim", "不倒翁", "ottogi", "八道", "paldo", "康师傅", "统一", "今麦郎", "日清", "nissin", "出前一丁", "合味道", "cup noodle", "汤达人", "拉面说", "自嗨锅", "莫小仙", "小龙坎", "德庄", "海底捞", "颐海国际", "卫龙", "三只松鼠", "良品铺子", "百草味", "洽洽", "旺旺", "盼盼", "达利园", "好吃点"],
+            "智能家居": ["小米", "米家", "mijia", "xiaomi", "华为", "huawei", "苹果", "apple", "homekit", "天猫精灵", "阿里", "alibaba", "百度", "baidu", "小度", "京东", "jd", "叮咚", "美的", "midea", "海尔", "haier", "格力", "gree", "奥克斯", "aux", "海信", "hisense", "tcl", "创维", "skyworth", "长虹", "changhong", "康佳", "konka", "戴森", "dyson", "飞利浦", "philips", "松下", "panasonic", "博世", "bosch", "西门子", "siemens", "三星", "samsung", "lg"],
+            "笔记本电脑": ["苹果", "apple", "macbook", "mac", "联想", "lenovo", "拯救者", "thinkpad", "小新", "yoga", "戴尔", "dell", "xps", "alienware", "外星人", "惠普", "hp", "暗影精灵", "光影精灵", "华硕", "asus", "rog", "玩家国度", "天选", "宏碁", "acer", "掠夺者", "微星", "msi", "雷蛇", "razer", "华为", "huawei", "matebook", "荣耀", "honor", "magicbook", "小米", "xiaomi", "redmibook", "机械革命", "机械师", "雷神", "神舟", "hasee"],
+            "平板电脑": ["苹果", "apple", "ipad", "华为", "huawei", "matepad", "小米", "xiaomi", "pad", "联想", "lenovo", "小新pad", "拯救者y900", "三星", "samsung", "galaxy tab", "微软", "microsoft", "surface", "荣耀", "honor", "v pad", "oppo", "vivo", "iqoo", "台电", "teclast", "酷比魔方", "cube", "昂达", "onda", "中柏", "jumper"],
+            "运动鞋": ["耐克", "nike", "air jordan", "aj", "阿迪达斯", "adidas", "三叶草", "originals", "彪马", "puma", "锐步", "reebok", "匡威", "converse", "万斯", "vans", "新百伦", "new balance", "nb", "亚瑟士", "asics", "鬼冢虎", "onitsuka tiger", "美津浓", "mizuno", "索康尼", "saucony", "布鲁克斯", "brooks", "hoka", "昂跑", "on", "安踏", "anta", "李宁", "lining", "特步", "xtep", "361度", "361", "匹克", "peak", "鸿星尔克", "erke", "回力", "warrior", "飞跃", "feiyue"],
+            "服装": ["优衣库", "uniqlo", "zara", "hm", "h&m", "gap", "盖璞", "c&a", "ca", "forever 21", "耐克", "nike", "阿迪达斯", "adidas", "彪马", "puma", "安踏", "anta", "李宁", "lining", "特步", "xtep", "361度", "361", "匹克", "peak", "鸿星尔克", "erke", "波司登", "bosideng", "雅戈尔", "youngor", "七匹狼", "septwolves", "劲霸", "k-boxing", "海澜之家", "hla", "罗蒙", "romon", "杉杉", "firs", "太平鸟", "peacebird", "乐町", "ledin", "only", "vero moda", "jack jones", "selected", "欧时力", "ochirly", "five plus", "哥弟", "girdear", "阿玛施", "amass", "茵曼", "inman", "韩都衣舍", "hstyle", "裂帛", "liebo", "初语", "toyoung", "森马", "semir", "美特斯邦威", "metersbonwe", "以纯", "yishion", "真维斯", "jeanswest", "班尼路", "baleno", "佐丹奴", "giordano"],
+            "护肤品": ["兰蔻", "lancome", "雅诗兰黛", "estee lauder", "资生堂", "shiseido", "skii", "sk-ii", "海蓝之谜", "lamer", "la mer", "赫莲娜", "hr", "helena rubinstein", "娇兰", "guerlain", "希思黎", "sisley", "碧欧泉", "biotherm", "科颜氏", "kiehls", "kiehl's", "悦木之源", "origins", "倩碧", "clinique", "雅漾", "avene", "理肤泉", "la roche-posay", "修丽可", "skinceuticals", "薇诺娜", "winona", "玉泽", "dr.yu", "珀莱雅", "proya", "丸美", "marubi", "自然堂", "chando", "百雀羚", "pechoin", "相宜本草", "inoherb", "韩束", "kans", "一叶子", "one leaf", "膜法世家", "mask family", "御泥坊", "yunifang", "美即", "mg", "欧莱雅", "loreal", "olay", "玉兰油", "大宝", "dabao", "旁氏", "ponds", "妮维雅", "nivea", "曼秀雷敦", "mentholatum", "露得清", "neutrogena"],
+            "化妆品": ["迪奥", "dior", "香奈儿", "chanel", "圣罗兰", "ysl", "阿玛尼", "armani", "纪梵希", "givenchy", "兰蔻", "lancome", "雅诗兰黛", "estee lauder", "资生堂", "shiseido", "mac", "魅可", "nars", "纳斯", "bobbi brown", "芭比波朗", "植村秀", "shu uemura", "make up for ever", "玫珂菲", "benefit", "贝玲妃", "too faced", "tarte", "urban decay", "衰败城市", "3ce", "三熹玉", "完美日记", "perfect diary", "花西子", "florasis", "colorkey", "珂拉琪", "橘朵", "judydoll", "酵色", "joocyee", "into you", "心慕与你", "卡姿兰", "carslan", "玛丽黛佳", "marie dalgar", "毛戈平", "maogeping", "稚优泉", "chioture", "美康粉黛", "meiking", "vnk", "诗佩妮", "spenny", "nyx", "essence", "catrice", "rimmel", "芮谜", "max factor", "蜜丝佛陀", "revlon", "露华浓", "maybelline", "美宝莲", "loreal", "欧莱雅", "olay", "玉兰油"],
+            "个护电器": ["戴森", "dyson", "飞利浦", "philips", "松下", "panasonic", "博朗", "braun", "飞科", "flyco", "超人", "sid", "罗曼", "roaman", "usmile", "舒克", "saky", "欧乐b", "oral-b", "佳洁士", "crest", "高露洁", "colgate", "黑人", "darlie", "云南白药", "舒适达", "sensodyne", "徕芬", "laifen", "追觅", "dreame", "素士", "soocas", "小米", "米家", "mijia", "xiaomi", "华为", "huawei", "美的", "midea", "海尔", "haier", "格力", "gree", "奥克斯", "aux", "康夫", "kangfu", "雷瓦", "riwa", "奔腾", "povos", "小熊", "bear", "北鼎", "buydeem"],
+            "玩具": ["乐高", "lego", "泡泡玛特", "pop mart", "万代", "bandai", "高达", "gundam", "孩之宝", "hasbro", "变形金刚", "transformers", "芭比", "barbie", "美泰", "mattel", "费雪", "fisher-price", "迪士尼", "disney", "漫威", "marvel", "dc", "奥特曼", "ultraman", "假面骑士", "kamen rider", "超级战队", "super sentai", "哆啦a梦", "doraemon", "皮卡丘", "pokemon", "宝可梦", "精灵宝可梦", "hello kitty", "三丽鸥", "sanrio", "line friends", "kakao friends", "茉莉", "molly", "dimoo", "skullpanda", "labubu", "zimomo", "the monsters", "潘神", "satyr rory", "毕奇", "pucky", "crybaby", "哭娃", "hirono", "小野", "zsiga", "duckoo", "rico", "nanci", "囡茜", "rolife", "若来", "suri", "苏蕊", "yoola", "悠拉", "aoto", "a baby", "chuchu", "啾啾", "pino jelly", "sweet bean", "小甜豆", "hacipupu", "dimoo", "auroro", "twinkle", "闪闪", "vivi", "cat", "喵", "dog", "汪", "bear", "熊", "rabbit", "兔", "fox", "狐狸", "deer", "鹿", "sheep", "羊", "cow", "牛", "pig", "猪"],
+            "游戏设备": ["索尼", "sony", "playstation", "ps5", "ps4", "微软", "microsoft", "xbox", "series x", "series s", "任天堂", "nintendo", "switch", "oled", "lite", "steam deck", "valve", "华硕", "asus", "rog", "ally", "联想", "lenovo", "拯救者", "legion go", "壹号本", "onexplayer", "gpd", "ayaneo", "ayn", "odin", "retroid", "pocket", "anbernic", "周哥", "rg35xx", "rg353v", "miyoo", "powkiddy", "霸王小子", "小霸王", "subor", "酷孩", "coobox", "歌美", "gemei", "丁果", "dingoo", "金星", "jxd", "索爱", "soaiy", "纽曼", "newsmy", "台电", "teclast", "酷比魔方", "cube", "昂达", "onda", "中柏", "jumper"],
+            "相机": ["佳能", "canon", "eos", "r5", "r6", "r7", "r8", "r10", "r50", "r100", "索尼", "sony", "alpha", "a7", "a7r", "a7s", "a9", "a1", "a6000", "a6100", "a6300", "a6400", "a6500", "a6600", "zv-1", "zv-e10", "尼康", "nikon", "z5", "z6", "z7", "z8", "z9", "z30", "z50", "zfc", "富士", "fujifilm", "x-t", "x-s", "x-pro", "x-e", "x-a", "x-m", "gfx", "哈苏", "hasselblad", "徕卡", "leica", "m11", "q2", "sl2", "松下", "panasonic", "lumix", "s1", "s5", "gh", "gx", "gf", "奥林巴斯", "olympus", "om system", "em-1", "em-5", "em-10", "pen-f", "宾得", "pentax", "k-1", "k-3", "k-70", "理光", "ricoh", "gr", "gr iii", "适马", "sigma", "fp", "腾龙", "tamron", "图丽", "tokina", "蔡司", "zeiss", "batis", "loxia", "otus", "milvus", "永诺", "yongnuo", "唯卓仕", "viltrox", "老蛙", "laowa", "七工匠", "7artisans", "星曜", "brightin star", "铭匠", "ttartisan"],
+            "数码配件": ["绿联", "ugreen", "倍思", "baseus", "安克", "anker", "品胜", "pisen", "飞毛腿", "scud", "罗马仕", "romoss", "小米", "米家", "mijia", "xiaomi", "华为", "huawei", "苹果", "apple", "贝尔金", "belkin", "摩米士", "momax", "图拉斯", "torras", "邦克仕", "benks", "闪魔", "smartdevil", "亿色", "esr", "第一卫", "divi", "机乐堂", "joyroom", "耐尔金", "nillkin", "洛克", "rock", "思锐", "sirui", "百诺", "benro", "曼富图", "manfrotto", "捷信", "gitzo", "富图宝", "fotopro", "伟峰", "weifeng", "神牛", "godox", "金贝", "jinbei", "保富图", "profoto", "爱图仕", "aputure", "南光", "nanlite", "斯莫格", "smallrig", "铁头", "tilta", "大疆", "dji", "osmo", "pocket", "action", "mavic", "air", "mini", "insta360", "影石", "gopro", "骁途", "sjcamo", "山狗", "sjcam", "萤石", "ezviz", "海康威视", "hikvision", "大华", "dahua", "tp-link", "普联", "水星", "mercury", "迅捷", "fast", "华硕", "asus", "网件", "netgear", "领势", "linksys", "小米", "红米", "redmi", "华为", "荣耀", "honor", "360", "百度", "小度", "天猫精灵"],
+        }
         
         # 停用词列表（过滤无意义的词）
         stopwords = set([
@@ -763,20 +783,6 @@ def extract_keywords_with_jieba(text, product_name="", product_category="", top_
             'php', 'jpg', 'png', 'gif', 'http', 'https', 'www', 'com', 'cn', 'net', 'org',
             '会员', '登录', '注册', '密码', '账号', '用户', '客服', '电话', '地址', '邮箱',
             '图片', '视频', '音频', '文件', '下载', '上传', '链接', '网站', '网页', '页面',
-            # 常见品牌名（确保不出现品牌名，中英文都加）
-            '苹果', 'apple', 'iphone', '华为', 'huawei', 'mate', '小米', 'xiaomi', 'redmi', '红米',
-            'oppo', 'vivo', 'iqoo', '荣耀', 'honor', '三星', 'samsung', 'galaxy', '魅族', 'meizu',
-            '一加', 'oneplus', 'realme', '真我', '努比亚', 'nubia', '黑鲨', 'rog', '联想', 'lenovo',
-            '白象', '三养', 'samyang', '农心', 'nongshim', '不倒翁', 'ottogi', '八道', 'paldo',
-            '康师傅', '统一', '今麦郎', '日清', 'nissin', '出前一丁', '合味道', 'cup noodle',
-            '蜜雪冰城', 'mixue', '喜茶', 'heytea', '奈雪', 'nayuki', '茶百道', 'chagee', '古茗',
-            '沪上阿姨', 'auntea jenny', '丘大叔', '挞柠', '茶救星球', '1柠1', '啊一柠檬茶',
-            '科沃斯', 'ecovacs', '石头', 'roborock', '云鲸', 'narwal', '追觅', 'dreame', '美的', 'midea',
-            '海尔', 'haier', '格力', 'gree', '戴森', 'dyson', '小米米家', 'mijia', '飞利浦', 'philips',
-            '瑞幸', 'luckin', '星巴克', 'starbucks', 'manner', 'm stand', 'seesaw', 'tims', '库迪', 'cotti',
-            '京东', 'jd', '淘宝', 'taobao', '天猫', 'tmall', '拼多多', 'pinduoduo', '苏宁', '国美', '唯品会',
-            '抖音', 'douyin', 'tiktok', '快手', 'kuaishou', '小红书', 'xiaohongshu', 'red', 'b站', '哔哩哔哩', 'bilibili',
-            '微博', 'weibo', '微信', 'wechat', '知乎', 'zhihu',
             # 产品型号常见词（确保不出现型号词）
             'pro', 'max', 'ultra', 'plus', 'mini', 'air', 'lite', 'se', 's', 'e', 'x', 'xr', 'xs',
             '系列', 'version', 'edition', 'gen', 'generation', 'model', 'type', '款', '代', '版',
@@ -784,9 +790,28 @@ def extract_keywords_with_jieba(text, product_name="", product_category="", top_
             # 常见网页噪音词
             '点击', '查看', '详情', '更多', '了解', '购买', '下单', '客服', '咨询', '售后', '保修',
             '正品', '行货', '水货', '翻新', '二手', '全新', '包邮', '快递', '物流', '发货', '收货',
+            # 常见评价无意义词
+            '真的', '非常', '特别', '十分', '相当', '比较', '有点', '有些', '有的', '有时',
+            '感觉', '觉得', '认为', '以为', '看来', '听说', '据说', '总的来说', '总而言之',
+            '一个', '一下', '一些', '一点', '一样', '一直', '一定', '一般', '一起', '一共',
+            '不是', '不会', '不能', '不要', '不用', '不如', '不过', '不仅', '不但', '不管',
+            '还是', '还有', '还是', '或者', '或许', '也许', '可能', '应该', '必须', '需要',
+            '这个', '那个', '这些', '那些', '这样', '那样', '这么', '那么', '怎么', '什么',
+            '为什么', '怎么样', '怎么办', '如何', '为何', '哪里', '哪个', '哪些', '几时', '多少',
         ])
         
-        # 从产品名和类别中提取关键词，加入停用词（避免统计产品名本身和品牌名）
+        # ========== 根据产品类别自动添加品牌库到停用词 ==========
+        category_lower = product_category.lower() if product_category else ""
+        for cat, brands in BRAND_LIBRARY.items():
+            if cat in category_lower or category_lower in cat:
+                for brand in brands:
+                    stopwords.add(brand.lower())
+                    # 同时添加品牌名的前2字、前3字变体（比如"科沃斯"→"科沃"）
+                    if len(brand) >= 3 and re.match(r'^[\u4e00-\u9fa5]+$', brand):
+                        stopwords.add(brand[:2].lower())
+                        stopwords.add(brand[:3].lower())
+        
+        # ========== 从产品名中提取所有可能的品牌名和型号变体 ==========
         product_words = set()
         
         # 提取产品名中的所有词（中文、英文、数字）
@@ -804,16 +829,36 @@ def extract_keywords_with_jieba(text, product_name="", product_category="", top_
                         if len(part) >= 2:
                             product_words.add(part.lower())
         
-        # 也提取中文词组
+        # 提取中文词组，并添加前2字、前3字变体（关键！确保"科沃斯"→"科沃"也被过滤）
         for word in re.findall(r'[\u4e00-\u9fa5]+', all_product_text):
             if len(word) >= 2:
                 product_words.add(word.lower())
+                # 添加前2字变体
+                if len(word) >= 3:
+                    product_words.add(word[:2].lower())
+                    product_words.add(word[:3].lower())
+                # 添加前2字变体（对于2字词，就是它本身）
+                if len(word) == 2:
+                    product_words.add(word.lower())
+        
+        # 用jieba分词产品名，提取所有可能的词
+        try:
+            jieba_words = jieba.lcut(product_name)
+            for w in jieba_words:
+                w = w.strip().lower()
+                if len(w) >= 2 and re.match(r'^[\u4e00-\u9fa5a-zA-Z]+$', w):
+                    product_words.add(w)
+                    # 添加前2字变体
+                    if len(w) >= 3 and re.match(r'^[\u4e00-\u9fa5]+$', w):
+                        product_words.add(w[:2].lower())
+        except:
+            pass
         
         # 合并所有停用词
         all_stopwords = stopwords | product_words
         
-        # 提取长度>=3的产品名子词，用于模糊匹配（比如"iphone"、"pro"、"max"）
-        product_subwords = {w for w in product_words if len(w) >= 3}
+        # 提取长度>=2的产品名子词，用于模糊匹配（关键！之前是>=3，现在改成>=2）
+        product_subwords = {w for w in product_words if len(w) >= 2}
         
         # 用jieba分词
         words = jieba.lcut(text)
@@ -827,12 +872,28 @@ def extract_keywords_with_jieba(text, product_name="", product_category="", top_
                 re.match(r'^[\u4e00-\u9fa5a-zA-Z]+$', word) and
                 word not in all_stopwords and
                 not re.match(r'^\d+$', word)):
-                # 额外检查：如果词包含产品名子词（长度>=3），也过滤掉
+                # 额外检查1：如果词包含产品名子词（长度>=2），也过滤掉
                 contains_product = False
                 for pw in product_subwords:
                     if pw in word:
                         contains_product = True
                         break
+                # 额外检查2：如果词包含任何品牌库中的品牌名（长度>=2），也过滤掉
+                if not contains_product:
+                    for cat, brands in BRAND_LIBRARY.items():
+                        for brand in brands:
+                            brand_lower = brand.lower()
+                            if len(brand_lower) >= 2 and brand_lower in word:
+                                contains_product = True
+                                break
+                        if contains_product:
+                            break
+                # 额外检查3：如果词是纯英文且长度<=4，检查是否是常见品牌缩写
+                if not contains_product and re.match(r'^[a-zA-Z]+$', word) and len(word) <= 4:
+                    common_brands = {'apple', 'huawei', 'xiaomi', 'oppo', 'vivo', 'sony', 'lg', 'hp', 'dell', 'asus', 'acer', 'msi', 'rog', 'nike', 'adidas', 'puma', 'uniqlo', 'zara', 'nars', 'mac', 'dior', 'ysl', 'gopro', 'dji', 'tp', 'jd', 'tv', 'pc', 'app', 'web', 'api', 'ui', 'ux', 'ai', 'vr', 'ar', 'iot', '5g', '4g', '3g', '2g', '1g', 'gps', 'nfc', 'wifi', '蓝牙', 'usb', 'hdmi', 'dp', 'vga', 'dvi', 'rgb', 'led', 'lcd', 'oled', 'amoled', 'ips', 'tn', 'va', 'pls', 'ads', 'hva', 'mva', 'pva', 'ffs', 'ffs'}
+                    if word in common_brands:
+                        contains_product = True
+                
                 if not contains_product:
                     word_count[word] += 1
         
